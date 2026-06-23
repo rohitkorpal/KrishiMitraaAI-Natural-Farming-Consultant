@@ -16,6 +16,7 @@ st.set_page_config(
 )
 
 # Helper functions for Gemini API
+# this function is only for streamlit don't change
 def get_api_key():
     # Streamlit Cloud Secrets
     try:
