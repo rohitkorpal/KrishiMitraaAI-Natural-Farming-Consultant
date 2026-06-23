@@ -691,21 +691,32 @@ elif menu in ["🌾 Crop & Seed Guidance", "🌾 फसल और बीज म�
         if err:
             st.error(f"Error calling model: {err}")
         else:
-            st.markdown(f"### { 'Top Recommended Crops' if not is_hindi else 'शीर्ष अनुशंसित फसलें' }")
-            
-            # Display results in cards
-            for i, (crop, prob) in enumerate(predictions):
-                # Fetch seed details
-                seed_info = seed_data.get(crop.lower(), {
-                    "seeds": ["Local Desi varieties"],
-                    "season": "Local cropping season",
-                    "duration": "N/A",
-                    "schemes": ["PM-KISAN"],
-                    "organic_tip": "Apply general Jeevamrutha soil manure."
-                })
+            st.session_state.crop_predictions = predictions
+            st.session_state.soil_params = {
+                "n": n, "p": p, "k": k, "temp": temp, "hum": hum, "ph": ph, "rain": rain
+            }
+            if "crop_plan" in st.session_state:
+                del st.session_state.crop_plan
                 
-                # Render beautiful card
-                st.markdown(f"""<div class="glass-card" style="border-left: 5px solid { '#74c69d' if i==0 else 'rgba(116,198,157,0.3)' };">
+    if "crop_predictions" in st.session_state:
+        predictions = st.session_state.crop_predictions
+        soil = st.session_state.soil_params
+        
+        st.markdown(f"### { 'Top Recommended Crops' if not is_hindi else 'शीर्ष अनुशंसित फसलें' }")
+        
+        # Display results in cards
+        for i, (crop, prob) in enumerate(predictions):
+            # Fetch seed details
+            seed_info = seed_data.get(crop.lower(), {
+                "seeds": ["Local Desi varieties"],
+                "season": "Local cropping season",
+                "duration": "N/A",
+                "schemes": ["PM-KISAN"],
+                "organic_tip": "Apply general Jeevamrutha soil manure."
+            })
+            
+            # Render beautiful card
+            st.markdown(f"""<div class="glass-card" style="border-left: 5px solid { '#74c69d' if i==0 else 'rgba(116,198,157,0.3)' };">
 <div style="display:flex; justify-content:space-between; align-items:center;">
 <h3 style="margin:0; color:#e8f5e9;">{crop.capitalize()}</h3>
 <span class="tag">Confidence: {prob:.1%}</span>
@@ -723,6 +734,37 @@ elif menu in ["🌾 Crop & Seed Guidance", "🌾 फसल और बीज म�
 </p>
 </div>
 </div>
+</div>""", unsafe_allow_html=True)
+            
+        # Add AI Crop Plan Explainer Button
+        top_crop = predictions[0][0]
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button(f"🌱 Generate Custom Organic Cultivation Plan for {top_crop.capitalize()}" if not is_hindi else f"🌱 {top_crop.capitalize()} के लिए कस्टम जैविक रोपण योजना बनाएं", key="btn_crop_plan"):
+            with st.spinner("Generating custom organic planting plan... / रोपण योजना तैयार कर रहे हैं..."):
+                prompt = (
+                    f"Create a highly detailed, step-by-step custom organic cultivation plan for growing {top_crop.capitalize()} based on these soil and environmental parameters:\n"
+                    f"- Nitrogen (N): {soil['n']} kg/ha\n"
+                    f"- Phosphorus (P): {soil['p']} kg/ha\n"
+                    f"- Potassium (K): {soil['k']} kg/ha\n"
+                    f"- Average Temperature: {soil['temp']}°C\n"
+                    f"- Relative Humidity: {soil['hum']}%\n"
+                    f"- Soil pH: {soil['ph']}\n"
+                    f"- Expected Rainfall: {soil['rain']} mm\n\n"
+                    f"Please structure the cultivation plan with the following sections:\n"
+                    f"1. Soil Preparation & Organic Amendments (Tailor recommendations to the N-P-K and pH levels. Suggest specific composts/green manures).\n"
+                    f"2. Seed Treatment & Sowing (Recommend organic seed treatment methods like Beejamrutha, and outline spacing/depth).\n"
+                    f"3. Irrigation & Water Management (Adjust based on temperature, humidity, and expected rainfall).\n"
+                    f"4. Organic Nutrient & Pest Management (Propose specific formulas like Jeevamrutha or Neelastram/Agni Astra, outlining dosage and timeline).\n"
+                    f"5. Companion Crops & Multilevel Suitability (Which cover crops or intercrops would benefit this system).\n\n"
+                    f"Ensure all recommendations are strictly organic and natural farming oriented. Avoid any chemical inputs. Keep the language simple and clear."
+                )
+                ai_response = call_gemini(prompt, system_instruction=SYSTEM_INSTRUCTION)
+                st.session_state.crop_plan = ai_response
+                
+        if "crop_plan" in st.session_state:
+            st.markdown(f"""<div class="glass-card" style="border-left: 5px solid #74c69d; margin-top:20px;">
+<h3 style="color:#74c69d; margin-top:0;">{ 'Custom Organic Planting Plan' if not is_hindi else 'कस्टम जैविक रोपण योजना' }</h3>
+<p style="font-size:1.05rem; line-height:1.6; color:#e8f5e9; white-space: pre-wrap;">{st.session_state.crop_plan}</p>
 </div>""", unsafe_allow_html=True)
 
 # ----------------------------------------------------
@@ -852,6 +894,29 @@ elif menu in ["🌦️ Weather & Market Intel", "🌦️ मौसम और म
 <span style="font-size:0.85rem; color:{trend_color};">{trend_arrow} {info['change']}</span>
 </div>
 </div>""", unsafe_allow_html=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📈 Analyze Mandi Trends & Strategy" if not is_hindi else "📈 मंडी रुझान और रणनीति विश्लेषण", key="btn_mandi_analysis"):
+            with st.spinner("Analyzing market trends... / मंडी रुझान का विश्लेषण कर रहे हैं..."):
+                prices_str = "\n".join([f"- {crop}: Price {info['price']}, Daily Change {info['change']}, Trend Direction: {info['trend']}" for crop, info in market_prices.items()])
+                prompt = (
+                    f"Analyze the following market prices and trends for crops to provide strategic marketing and cultivation advice for farmers:\n\n"
+                    f"{prices_str}\n\n"
+                    f"Please structure your response with the following headings:\n"
+                    f"1. Market Trend Summary (Highlight which crops are highly profitable now or rising fast).\n"
+                    f"2. Holding vs Selling Advice (Should farmers sell immediately or store their produce for later price increases, especially for downward trending crops?).\n"
+                    f"3. Value-Addition Strategies (How can farmers process these crops organically to double their income, e.g., turning mustard into organic oil, cotton into threads, wheat into premium flour?).\n"
+                    f"4. Recommended Crop Shift (Suggestions on what crop to sow next based on the trends).\n\n"
+                    f"Keep it highly practical, farmer-focused, ZBNF-aligned, and write in the style of an expert agricultural economist."
+                )
+                ai_response = call_gemini(prompt, system_instruction=SYSTEM_INSTRUCTION)
+                st.session_state.mandi_analysis = ai_response
+                
+        if "mandi_analysis" in st.session_state:
+            st.markdown(f"""<div class="glass-card" style="border-left: 5px solid #74c69d; margin-top:20px;">
+<h3 style="color:#74c69d; margin-top:0;">{ 'Market Trends & Strategy Analysis' if not is_hindi else 'मंडी रुझान और रणनीति विश्लेषण' }</h3>
+<p style="font-size:1.05rem; line-height:1.6; color:#e8f5e9; white-space: pre-wrap;">{st.session_state.mandi_analysis}</p>
+</div>""", unsafe_allow_html=True)
 
 # ----------------------------------------------------
 # 5. Natural Farming Academy Module
@@ -930,3 +995,22 @@ elif menu in ["📚 Natural Farming Academy", "📚 प्राकृतिक 
                         <p style="font-size:0.95rem; line-height:1.4;">{desc}</p>
                     </div>
                 """, unsafe_allow_html=True)
+                
+    st.markdown("---")
+    st.markdown(f"### 🔍 { 'Ask the Organic Expert' if not is_hindi else 'जैविक विशेषज्ञ से पूछें' }")
+    st.write("Got a question about preparing formulations, plant spacing, or multi-layer farming? Ask our AI expert!")
+    
+    academy_query = st.text_input("Enter your question / अपना प्रश्न दर्ज करें", placeholder="e.g., How to control pests in Layer 5 crops organically?", key="academy_query_input")
+    if st.button("Ask Expert" if not is_hindi else "विशेषज्ञ से पूछें", key="academy_query_btn"):
+        if academy_query:
+            with st.spinner("Expert is drafting a response... / विशेषज्ञ उत्तर तैयार कर रहे हैं..."):
+                system_instruction = """You are an expert advisor in Zero Budget Natural Farming (ZBNF) and organic farming.
+Provide deep, highly actionable, step-by-step instructions. Focus purely on natural and organic methods, including companion planting, multi-canopy layers, and traditional Indian formulations. Do not recommend any chemicals."""
+                response = call_gemini(academy_query, system_instruction=system_instruction)
+                st.session_state.academy_response = response
+                
+    if "academy_response" in st.session_state:
+        st.markdown(f"""<div class="glass-card" style="border-left: 5px solid #74c69d; margin-top:15px;">
+<h4 style="color:#74c69d; margin-top:0;">{ 'Expert Response' if not is_hindi else 'विशेषज्ञ की प्रतिक्रिया' }</h4>
+<p style="font-size:1.05rem; line-height:1.6; color:#e8f5e9; white-space: pre-wrap;">{st.session_state.academy_response}</p>
+</div>""", unsafe_allow_html=True)
