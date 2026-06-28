@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import joblib
 
 # Importing Data
-crop = pd.read_csv(r"C:\Users\rohit\Downloads\AgroSolution-main\UI - Copy\data\Crop_recommendation.csv")
+crop = pd.read_csv(r"C:\Users\rohit\Downloads\KrishiMitraaAI-main\UI - Copy\data\Crop_recommendation.csv")
 
 # Display dataset information
 print("Dataset Head:")
